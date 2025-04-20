@@ -32,6 +32,65 @@ app.get("/schemes", async (req, res) => {
   }
 });
 
+// Signup API (by Username)
+app.post('/signup', async (req, res) => {
+  const { username, email, password } = req.body;
+
+  try {
+    // Check if username already exists
+    const userCheck = await pool.query(
+      'SELECT * FROM Users WHERE username = $1',
+      [username]
+    );
+
+    if (userCheck.rows.length > 0) {
+      return res.status(400).json({ message: 'Username already taken' });
+    }
+
+    // Insert into DB
+    await pool.query(
+      'INSERT INTO Users (username, email, password) VALUES ($1, $2, $3)',
+      [username, email || null, password]
+    );
+
+    res.status(201).json({ message: 'User registered successfully' });
+
+  } catch (error) {
+    console.error('Signup error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
+// Signin API (using Username)
+app.post('/signin', async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const result = await pool.query(
+      'SELECT * FROM Users WHERE username = $1 AND password = $2',
+      [username, password]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ message: 'Invalid username or password' });
+    }
+
+    const user = result.rows[0];
+    res.status(200).json({
+      message: 'Login successful',
+      user: {
+        id: user.user_id,
+        username: user.username,
+        email: user.email
+      }
+    });
+
+  } catch (error) {
+    console.error('Signin error:', error);
+    res.status(500).json({ message: 'Internal Server Error' });
+  }
+});
+
 // Start Server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
