@@ -187,11 +187,16 @@ app.get("/dynamicschemes", async (req, res) => {
   }
   
   if (application_mode) {
-    const condition = ` AND $${i} = ANY(application_mode)`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(application_mode);
-    i++;
+    // Check if the value is "all" or similar to return both offline and online schemes
+    if (application_mode.toLowerCase() === "all" || application_mode.toLowerCase() === "common") {
+      // No filter needed for "all" - it will return both offline and online schemes
+    } else {
+      const condition = ` AND $${i} = ANY(application_mode)`;
+      countQuery += condition;
+      dataQuery += condition;
+      params.push(application_mode);
+      i++;
+    }
   }
 
   if (scheme_category) {
