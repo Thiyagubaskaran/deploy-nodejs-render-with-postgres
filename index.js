@@ -51,64 +51,183 @@ app.get("/schemes", async (req, res) => {
 //     res.status(500).json({ error: "Internal Server Error" });
 //   }
 // });
-app.get("/dynamicschemes", async (req, res) => {
-  const { age, gender, caste, occupation, residence,application_mode,scheme_category } = req.query;
+// app.get("/dynamicschemes", async (req, res) => {
+//   const { age, gender, caste, occupation, residence,application_mode,scheme_category } = req.query;
 
-  let query = "SELECT * FROM Schemes WHERE 1=1";
+//   let query = "SELECT * FROM Schemes WHERE 1=1";
+//   const params = [];
+//   let i = 1;
+
+//   if (age) {
+//     query += ` AND $${i}::int BETWEEN 
+//                   CAST(SPLIT_PART(age, '-', 1) AS INT) AND 
+//                   CAST(SPLIT_PART(age, '-', 2) AS INT)`;
+//     params.push(age);
+//     i++;
+//   }
+
+//   if (gender) {
+//     query += ` AND gender = $${i}`;
+//     params.push(gender);
+//     i++;
+//   }
+
+//   if (caste) {
+//     query += ` AND caste = $${i}`;
+//     params.push(caste);
+//     i++;
+//   }
+
+//   if (occupation) {
+//     query += ` AND occupation = $${i}`;
+//     params.push(occupation);
+//     i++;
+//   }
+
+//   if (residence) {
+//     query += ` AND residence = $${i}`;
+//     params.push(residence);
+//     i++;
+//   }
+//   if (application_mode) {
+//     query += ` AND $${i} = ANY(application_mode)`;
+//     params.push(application_mode);
+//     i++;
+//   }
+
+//   if (scheme_category) {
+//     query += ` AND $${i} = ANY(scheme_category)`;
+//     params.push(scheme_category);
+//     i++;
+//   }
+//   try {
+//     const result = await pool.query(query, params);
+//     res.json(result.rows);
+//   } catch (error) {
+//     console.error("Error:", error);
+//     res.status(500).json({ error: "Internal Server Error" });
+//   }
+// });
+
+app.get("/dynamicschemes", async (req, res) => {
+  // Extract filter parameters
+  const { 
+    age, 
+    gender, 
+    caste, 
+    occupation, 
+    residence, 
+    application_mode, 
+    scheme_category,
+    page = 1,
+    limit = 10 
+  } = req.query;
+
+  // Convert page and limit to integers
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  
+  // Validate pagination parameters
+  if (isNaN(pageNum) || isNaN(limitNum) || pageNum < 1 || limitNum < 1) {
+    return res.status(400).json({ 
+      error: "Invalid pagination parameters. Page and limit must be positive integers." 
+    });
+  }
+
+  // Calculate offset
+  const offset = (pageNum - 1) * limitNum;
+
+  // Build the base query
+  let countQuery = "SELECT COUNT(*) FROM Schemes WHERE 1=1";
+  let dataQuery = "SELECT * FROM Schemes WHERE 1=1";
   const params = [];
   let i = 1;
 
+  // Add filter conditions
   if (age) {
-    query += ` AND $${i}::int BETWEEN 
-                  CAST(SPLIT_PART(age, '-', 1) AS INT) AND 
-                  CAST(SPLIT_PART(age, '-', 2) AS INT)`;
+    const condition = ` AND $${i}::int BETWEEN 
+      CAST(SPLIT_PART(age, '-', 1) AS INT) AND 
+      CAST(SPLIT_PART(age, '-', 2) AS INT)`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(age);
     i++;
   }
 
   if (gender) {
-    query += ` AND gender = $${i}`;
+    const condition = ` AND gender = $${i}`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(gender);
     i++;
   }
 
   if (caste) {
-    query += ` AND caste = $${i}`;
+    const condition = ` AND caste = $${i}`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(caste);
     i++;
   }
 
   if (occupation) {
-    query += ` AND occupation = $${i}`;
+    const condition = ` AND occupation = $${i}`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(occupation);
     i++;
   }
 
   if (residence) {
-    query += ` AND residence = $${i}`;
+    const condition = ` AND residence = $${i}`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(residence);
     i++;
   }
+  
   if (application_mode) {
-    query += ` AND $${i} = ANY(application_mode)`;
+    const condition = ` AND $${i} = ANY(application_mode)`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(application_mode);
     i++;
   }
 
   if (scheme_category) {
-    query += ` AND $${i} = ANY(scheme_category)`;
+    const condition = ` AND $${i} = ANY(scheme_category)`;
+    countQuery += condition;
+    dataQuery += condition;
     params.push(scheme_category);
     i++;
   }
+
+  // Add pagination to data query only
+  dataQuery += ` ORDER BY scheme_id LIMIT $${i} OFFSET $${i+1}`;
+  const dataParams = [...params, limitNum, offset];
+
   try {
-    const result = await pool.query(query, params);
-    res.json(result.rows);
+    // Execute count query first to get total items
+    const countResult = await pool.query(countQuery, params);
+    const totalItems = parseInt(countResult.rows[0].count, 10);
+    const totalPages = Math.ceil(totalItems / limitNum);
+
+    // Execute data query with pagination
+    const dataResult = await pool.query(dataQuery, dataParams);
+    
+    // Return paginated response
+    res.json({
+      currentPage: pageNum,
+      totalPages: totalPages,
+      totalItems: totalItems,
+      itemsPerPage: limitNum,
+      schemes: dataResult.rows
+    });
   } catch (error) {
     console.error("Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-
 
 
 // Signup API (by Username)
