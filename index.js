@@ -119,6 +119,13 @@ app.get("/dynamicschemes", async (req, res) => {
     residence, 
     application_mode, 
     scheme_category,
+    differently_abled,
+    benefit_type,
+    government_employee,
+    marital_status,
+    level,
+    minority,
+    employment_status,
     page = 1,
     limit = 10 
   } = req.query;
@@ -144,46 +151,114 @@ app.get("/dynamicschemes", async (req, res) => {
   let i = 1;
 
   // Add filter conditions
-  if (age) {
-    const condition = ` AND $${i}::int BETWEEN 
-      CAST(SPLIT_PART(age, '-', 1) AS INT) AND 
-      CAST(SPLIT_PART(age, '-', 2) AS INT)`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(age);
-    i++;
-  }
+  // if (age) {
+  //   try {
+  //     // Make sure age is numeric before proceeding
+  //     if (!isNaN(parseInt(age))) {
+  //       // Use a safer approach that doesn't rely on casting the query parameter
+  //       // Instead, split and parse the values here in JavaScript
+  //       const ageRangeInDB = `
+  //         (CASE 
+  //           WHEN age ~ '^[0-9]+-[0-9]+$' THEN 
+  //             CAST(SPLIT_PART(age, '-', 1) AS INT) 
+  //           ELSE 0 
+  //         END) <= $${i} 
+  //         AND 
+  //         (CASE 
+  //           WHEN age ~ '^[0-9]+-[0-9]+$' THEN 
+  //             CAST(SPLIT_PART(age, '-', 2) AS INT) 
+  //           ELSE 200 
+  //         END) >= $${i}`;
+        
+  //       countQuery += ` AND (${ageRangeInDB})`;
+  //       dataQuery += ` AND (${ageRangeInDB})`;
+  //       params.push(parseInt(age));
+  //       i++;
+  //     } else {
+  //       console.warn(`Skipping invalid age filter value: ${age}`);
+  //     }
+  //   } catch (error) {
+  //     console.warn(`Error processing age filter: ${error.message}`);
+  //     // Skip this filter if there's an error
+  //   }
+  // }
+// ✅ AGE RANGE HANDLING: like "18-30"
+if (age) {
+  const match = age.match(/^(\d+)-(\d+)$/);
+  if (match) {
+    const reqMin = parseInt(match[1]);
+    const reqMax = parseInt(match[2]);
 
+    // Overlap condition: db_min <= reqMax AND reqMin <= db_max
+    const ageCondition = `
+      AND (
+        CAST(SPLIT_PART(age, '-', 1) AS INT) <= $${i} 
+        AND 
+        CAST(SPLIT_PART(age, '-', 2) AS INT) >= $${i + 1}
+      )
+    `;
+    countQuery += ageCondition;
+    dataQuery += ageCondition;
+    params.push(reqMax, reqMin);
+    i += 2;
+  } else {
+    console.warn(`Invalid age range format: ${age}`);
+  }
+}
   if (gender) {
-    const condition = ` AND gender = $${i}`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(gender);
-    i++;
+    // Check if the value is "all" to return all genders
+    if (gender.toLowerCase() === "all") {
+      // No filter needed for "all" - it will return all genders
+    } else {
+      // Make case-insensitive comparison and include "all" values
+      const condition = ` AND (LOWER(gender) = LOWER($${i}) OR LOWER(gender) = 'all')`;
+      countQuery += condition;
+      dataQuery += condition;
+      params.push(gender);
+      i++;
+    }
   }
 
   if (caste) {
-    const condition = ` AND caste = $${i}`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(caste);
-    i++;
+    // Check if the value is "all" to return all castes
+    if (caste.toLowerCase() === "all") {
+      // No filter needed for "all" - it will return all castes
+    } else {
+      // Make case-insensitive comparison and include "all" values
+      const condition = ` AND (LOWER(caste) = LOWER($${i}) OR LOWER(caste) = 'all')`;
+      countQuery += condition;
+      dataQuery += condition;
+      params.push(caste);
+      i++;
+    }
   }
 
   if (occupation) {
-    const condition = ` AND occupation = $${i}`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(occupation);
-    i++;
+    // Check if the value is "all" to return all occupations
+    if (occupation.toLowerCase() === "all") {
+      // No filter needed for "all" - it will return all occupations
+    } else {
+      // Make case-insensitive comparison and include "all" values
+      const condition = ` AND (LOWER(occupation) = LOWER($${i}) OR LOWER(occupation) = 'all')`;
+      countQuery += condition;
+      dataQuery += condition;
+      params.push(occupation);
+      i++;
+    }
   }
 
   if (residence) {
-    const condition = ` AND residence = $${i}`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(residence);
-    i++;
+    // Check if the value is "all" to return all residences
+    if (residence.toLowerCase() === "all") {
+      // No filter needed for "all" - it will return all residences
+    } else {
+      // Make case-insensitive comparison and include "all" values
+      const condition = ` AND (LOWER(residence) = LOWER($${i}) OR LOWER(residence) = 'all')`;
+      countQuery += condition;
+      dataQuery += condition;
+      params.push(residence);
+      i++;
+    }
   }
   
   if (application_mode) {
@@ -191,22 +266,168 @@ app.get("/dynamicschemes", async (req, res) => {
     if (application_mode.toLowerCase() === "all" || application_mode.toLowerCase() === "common") {
       // No filter needed for "all" - it will return both offline and online schemes
     } else {
-      const condition = ` AND $${i} = ANY(application_mode)`;
-      countQuery += condition;
-      dataQuery += condition;
-      params.push(application_mode);
-      i++;
+      try {
+        const condition = ` AND $${i} = ANY(application_mode)`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(application_mode);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing application_mode filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add differently_abled filter
+  if (differently_abled) {
+    // Check if the value is "all" to return all options
+    if (differently_abled.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(differently_abled) = LOWER($${i}) OR LOWER(differently_abled) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(differently_abled);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing differently_abled filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add benefit_type filter
+  if (benefit_type) {
+    // Check if the value is "all" to return all options
+    if (benefit_type.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(benefit_type) = LOWER($${i}) OR LOWER(benefit_type) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(benefit_type);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing benefit_type filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add government_employee filter
+  if (government_employee) {
+    // Check if the value is "all" to return all options
+    if (government_employee.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(government_employee) = LOWER($${i}) OR LOWER(government_employee) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(government_employee);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing government_employee filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add marital_status filter
+  if (marital_status) {
+    // Check if the value is "all" to return all options
+    if (marital_status.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(marital_status) = LOWER($${i}) OR LOWER(marital_status) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(marital_status);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing marital_status filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add level filter
+  if (level) {
+    // Check if the value is "all" to return all options
+    if (level.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(level) = LOWER($${i}) OR LOWER(level) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(level);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing level filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add minority filter
+  if (minority) {
+    // Check if the value is "all" to return all options
+    if (minority.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(minority) = LOWER($${i}) OR LOWER(minority) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(minority);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing minority filter: ${error.message}`);
+      }
+    }
+  }
+
+  // Add employment_status filter
+  if (employment_status) {
+    // Check if the value is "all" to return all options
+    if (employment_status.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        // Make case-insensitive comparison and include "all" values
+        const condition = ` AND (LOWER(employment_status) = LOWER($${i}) OR LOWER(employment_status) = 'all')`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(employment_status);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing employment_status filter: ${error.message}`);
+      }
     }
   }
 
   if (scheme_category) {
-    const condition = ` AND $${i} = ANY(scheme_category)`;
-    countQuery += condition;
-    dataQuery += condition;
-    params.push(scheme_category);
-    i++;
+    // Check if the value is "all" to return all scheme categories
+    if (scheme_category.toLowerCase() === "all") {
+      // No filter needed for "all"
+    } else {
+      try {
+        const condition = ` AND $${i} = ANY(scheme_category)`;
+        countQuery += condition;
+        dataQuery += condition;
+        params.push(scheme_category);
+        i++;
+      } catch (error) {
+        console.warn(`Error processing scheme_category filter: ${error.message}`);
+      }
+    }
   }
-
+  
   // Add pagination to data query only
   dataQuery += ` ORDER BY scheme_id LIMIT $${i} OFFSET $${i+1}`;
   const dataParams = [...params, limitNum, offset];
