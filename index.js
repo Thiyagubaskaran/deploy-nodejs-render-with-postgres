@@ -24,7 +24,7 @@ app.use(express.json());
 // API Route: Fetch All Schemes
 app.get("/schemes", async (req, res) => {
   try {
-    const result = await pool.query("SELECT * FROM Schemes2");
+    const result = await pool.query("SELECT * FROM Schemes");
     res.json(result.rows);
   } catch (error) {
     console.error("Error fetching schemes:", error);
@@ -145,8 +145,8 @@ app.get("/dynamicschemes", async (req, res) => {
   const offset = (pageNum - 1) * limitNum;
 
   // Build the base query
-  let countQuery = "SELECT COUNT(*) FROM Schemes2 WHERE 1=1";
-  let dataQuery = "SELECT * FROM Schemes2 WHERE 1=1";
+  let countQuery = "SELECT COUNT(*) FROM Schemes WHERE 1=1";
+  let dataQuery = "SELECT * FROM Schemes WHERE 1=1";
   const params = [];
   let i = 1;
 
